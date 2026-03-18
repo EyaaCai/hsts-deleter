@@ -3,7 +3,14 @@
   "name": "HSTS Deleter Auto",
   "version": "1.0.0",
   "description": "自动获取当前域名并辅助删除 HSTS 策略",
-  "permissions": ["tabs", "activeTab", "notifications", "offscreen", "clipboardWrite", "scripting"],
+  "permissions": [
+    "tabs",
+    "activeTab",
+    "notifications",
+    "offscreen",
+    "clipboardWrite",
+    "scripting"
+  ],
   "action": {
     "default_icon": {
       "16": "icons/icon16.png",

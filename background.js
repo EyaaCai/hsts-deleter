@@ -1,8 +1,3 @@
-/**
- * HSTS Deleter - 后台 Service Worker (Manifest V3)
- * 方案：Toast UI 替换了系统级通知
- */
-
 chrome.action.onClicked.addListener(async (tab) => {
   if (!tab.url) {
     showToastInTab(tab.id, '无法读取当前 URL', 'error');
@@ -19,8 +14,8 @@ chrome.action.onClicked.addListener(async (tab) => {
   const isCopied = await startCopyProcess(domain);
 
   // 2. 准备通知文本
-  const readyMessage = isCopied 
-    ? `[${domain}] 已复制！正在跳转管理页...` 
+  const readyMessage = isCopied
+    ? `[${domain}] 已复制！正在跳转管理页...`
     : `无法自动复制 [${domain}]，请手动操作。正在跳转...`;
 
   // 先在原网页显示加载提示
@@ -36,7 +31,11 @@ chrome.action.onClicked.addListener(async (tab) => {
 
       // 跳转后在管理页再出一次粘贴提示 (0.8s 给页面注入 JS 加载时间)
       setTimeout(() => {
-        showToastInTab(netTab.id, `请在下方粘贴并并点击删除: ${domain}`, 'success');
+        showToastInTab(
+          netTab.id,
+          `请在下方粘贴并并点击删除: ${domain}`,
+          'success',
+        );
       }, 800);
     } catch (err) {
       console.error(err);
@@ -51,15 +50,24 @@ async function showToastInTab(tabId, text, status = 'success') {
   try {
     // 检查这个 tab 是否已经有了 content.js
     // 如果没有（例如刚打开或者协议不支持注入），则尝试注入 UI 渲染代码
-    await chrome.tabs.sendMessage(tabId, { type: 'SHOW_TOAST', text, status }).catch(async () => {
-       // 报错意味着 content.js 还没跑，尝试动态注入一次逻辑
-       await chrome.scripting.executeScript({
-         target: { tabId },
-         files: ['content.js']
-       }).then(() => {
-          chrome.tabs.sendMessage(tabId, { type: 'SHOW_TOAST', text, status });
-       }).catch(e => console.warn('Could not inject into this page:', e));
-    });
+    await chrome.tabs
+      .sendMessage(tabId, { type: 'SHOW_TOAST', text, status })
+      .catch(async () => {
+        // 报错意味着 content.js 还没跑，尝试动态注入一次逻辑
+        await chrome.scripting
+          .executeScript({
+            target: { tabId },
+            files: ['content.js'],
+          })
+          .then(() => {
+            chrome.tabs.sendMessage(tabId, {
+              type: 'SHOW_TOAST',
+              text,
+              status,
+            });
+          })
+          .catch((e) => console.warn('Could not inject into this page:', e));
+      });
   } catch (err) {
     console.warn('Toast display failed:', err);
   }
@@ -70,7 +78,6 @@ async function showToastInTab(tabId, text, status = 'success') {
  */
 chrome.runtime.onMessage.addListener((message, sender) => {
   if (message.type === 'hsts-deleted-clicked' && sender.tab) {
-    // 关闭标签前，弹最后一个成功的 Toast (可选，因为页面马上关了)
     // 直接关闭
     chrome.tabs.remove(sender.tab.id);
   }
@@ -81,10 +88,16 @@ chrome.runtime.onMessage.addListener((message, sender) => {
  */
 async function startCopyProcess(domain) {
   try {
-    const existingContexts = await chrome.runtime.getContexts({ contextTypes: ['OFFSCREEN_DOCUMENT'] });
+    const existingContexts = await chrome.runtime.getContexts({
+      contextTypes: ['OFFSCREEN_DOCUMENT'],
+    });
     if (existingContexts.length === 0) {
-      await chrome.offscreen.createDocument({ url: 'offscreen.html', reasons: ['CLIPBOARD'], justification: 'domain copy' });
-      await new Promise(r => setTimeout(r, 400));
+      await chrome.offscreen.createDocument({
+        url: 'offscreen.html',
+        reasons: ['CLIPBOARD'],
+        justification: 'domain copy',
+      });
+      await new Promise((r) => setTimeout(r, 400));
     }
     return new Promise((resolve) => {
       const listener = (msg) => {
@@ -95,10 +108,18 @@ async function startCopyProcess(domain) {
         }
       };
       chrome.runtime.onMessage.addListener(listener);
-      const timeout = setTimeout(() => { chrome.runtime.onMessage.removeListener(listener); resolve(false); }, 1500);
-      chrome.runtime.sendMessage({ target: 'offscreen-clipboard', data: domain });
+      const timeout = setTimeout(() => {
+        chrome.runtime.onMessage.removeListener(listener);
+        resolve(false);
+      }, 1500);
+      chrome.runtime.sendMessage({
+        target: 'offscreen-clipboard',
+        data: domain,
+      });
     });
-  } catch (e) { return false; }
+  } catch (e) {
+    return false;
+  }
 }
 
 function extractDomain(urlStr) {
@@ -108,5 +129,7 @@ function extractDomain(urlStr) {
     let d = url.hostname;
     if (d.toLowerCase().startsWith('web.')) d = d.substring(4);
     return d;
-  } catch (e) { return null; }
+  } catch (e) {
+    return null;
+  }
 }

@@ -1,33 +1,61 @@
-// 监听来自 Background 的通知请求
+// 通知 background 脚本已就绪
+chrome.runtime.sendMessage({ type: 'CONTENT_READY' });
+
 chrome.runtime.onMessage.addListener((message) => {
-  if (message.type === 'SHOW_TOAST') {
-    showPremiumToast(message.text, message.status);
+  if (message.type === 'AUTO_DELETE_HSTS') {
+    autoProcessHSTS(message.domain);
   }
 });
 
-// 监听点击事件（原有逻辑保持）
-document.addEventListener(
-  'click',
-  (e) => {
-    const targetId = e.target.id;
-    if (
-      targetId === 'domain-security-policy-view-delete-submit' ||
-      (e.target.tagName === 'BUTTON' &&
-        e.target.textContent.toLowerCase().includes('delete'))
-    ) {
-      setTimeout(() => {
-        chrome.runtime.sendMessage({ type: 'hsts-deleted-clicked' });
-      }, 500);
-    }
-  },
-  true,
-);
+async function autoProcessHSTS(domain) {
+  const input = await waitForElement(
+    'domain-security-policy-view-delete-input',
+  );
+  if (!input) {
+    showToast(`[${domain}] 未找到输入框，请手动操作`, 'error');
+    return;
+  }
 
-/**
- * 渲染精美的悬浮提示条 (Toast)
- */
-function showPremiumToast(text, status = 'success') {
-  // 移除旧的 toast
+  // 填入域名并触发事件
+  input.value = domain;
+  ['input', 'change', 'blur'].forEach((name) => {
+    input.dispatchEvent(new Event(name, { bubbles: true }));
+  });
+
+  // 等待页面响应输入
+  await sleep(200);
+
+  const deleteBtn = document.getElementById(
+    'domain-security-policy-view-delete-submit',
+  );
+  if (!deleteBtn || deleteBtn.disabled) {
+    showToast(`[${domain}] 删除按钮不可用，请手动操作`, 'error');
+    return;
+  }
+
+  deleteBtn.click();
+  showToast(`[${domain}] 删除指令已发出`, 'success');
+
+  // 等待删除请求发出后再关闭标签页
+  await sleep(600);
+  chrome.runtime.sendMessage({ type: 'HSTS_DELETED' });
+}
+
+/** 轮询等待 DOM 元素出现 */
+async function waitForElement(id, maxAttempts = 20) {
+  for (let i = 0; i < maxAttempts; i++) {
+    const el = document.getElementById(id);
+    if (el) return el;
+    await sleep(100);
+  }
+  return null;
+}
+
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+function showToast(text, status = 'success') {
   const oldToast = document.getElementById('antigravity-hsts-toast');
   if (oldToast) oldToast.remove();
 
@@ -35,42 +63,34 @@ function showPremiumToast(text, status = 'success') {
   toast.id = 'antigravity-hsts-toast';
   toast.textContent = text;
 
-  // 样式设置：现代毛玻璃风格
   const bgColor =
     status === 'success'
-      ? 'rgba(0, 184, 148, 0.9)'
-      : 'rgba(255, 118, 117, 0.9)';
+      ? 'rgba(0, 184, 148, 0.95)'
+      : 'rgba(214, 48, 49, 0.95)';
+
   Object.assign(toast.style, {
     position: 'fixed',
     top: '20px',
     left: '50%',
-    transform: 'translateX(-50%) translateY(-100px)',
+    transform: 'translateX(-50%)',
     backgroundColor: bgColor,
-    backdropFilter: 'blur(10px)',
+    backdropFilter: 'blur(8px)',
     color: 'white',
     padding: '12px 24px',
     borderRadius: '12px',
-    boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
+    boxShadow: '0 8px 30px rgba(0,0,0,0.3)',
     zIndex: '2147483647',
     fontSize: '14px',
-    fontWeight: 'bold',
-    fontFamily:
-      '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-    transition: 'transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+    fontWeight: '600',
+    fontFamily: '-apple-system, sans-serif',
     pointerEvents: 'none',
     border: '1px solid rgba(255,255,255,0.2)',
+    textAlign: 'center',
+    transition: 'opacity 0.3s ease',
   });
 
   document.body.appendChild(toast);
-
-  // 强行触发布局刷新以开启动画
-  requestAnimationFrame(() => {
-    toast.style.transform = 'translateX(-50%) translateY(0)';
-  });
-
-  // 3秒后自动消失
   setTimeout(() => {
-    toast.style.transform = 'translateX(-50%) translateY(-100px)';
-    setTimeout(() => toast.remove(), 500);
-  }, 3500);
+    if (toast.parentElement) toast.remove();
+  }, 2000);
 }

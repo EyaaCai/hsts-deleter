@@ -1,16 +1,9 @@
 {
   "manifest_version": 3,
   "name": "HSTS Deleter Auto",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "自动获取当前域名并辅助删除 HSTS 策略",
-  "permissions": [
-    "tabs",
-    "activeTab",
-    "notifications",
-    "offscreen",
-    "clipboardWrite",
-    "scripting"
-  ],
+  "permissions": ["tabs", "activeTab"],
   "action": {
     "default_icon": {
       "16": "icons/icon16.png",
@@ -23,7 +16,7 @@
   },
   "content_scripts": [
     {
-      "matches": ["edge://net-internals/*", "chrome://net-internals/*"],
+      "matches": ["edge://net-internals/*"],
       "js": ["content.js"],
       "all_frames": true
     }
